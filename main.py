@@ -52,7 +52,8 @@ async def on_startup(bot: Bot):
 
 async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
-    logger.info("🛑 Webhook удалён")
+    await bot.session.close()  # 💡 Это устраняет предупреждение об открытой сессии
+    logger.info("🛑 Webhook удалён и сессия закрыта")
 
 # === Основной запуск ===
 async def create_app():
