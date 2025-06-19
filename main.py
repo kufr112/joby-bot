@@ -15,12 +15,23 @@ from add_job import router as add_job_router
 from actions import router as actions_router
 from logger_middleware import GlobalLoggerMiddleware
 
-# === Логирование ===
-logging.basicConfig(
-    level=logging.INFO,
-    format="📘 [%(asctime)s] [%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
+# === Логирование в файл и консоль ===
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter("📘 [%(asctime)s] [%(levelname)s] %(message)s")
+
+# Лог в файл
+file_handler = logging.FileHandler("full_debug.log", encoding="utf-8")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Лог в консоль (Render logs)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 # === Загрузка .env ===
 load_dotenv()
@@ -30,7 +41,6 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 IS_PROD = os.getenv("IS_PROD", "1") == "1"
 
-# === Проверка переменных ===
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN не найден!")
 if not WEBHOOK_HOST:
@@ -40,21 +50,21 @@ if not WEBHOOK_HOST:
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
-# === Подключение роутеров ===
+# === Подключение роутеров
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
 
-# === Middleware ===
+# === Middleware
 dp.message.middleware(GlobalLoggerMiddleware())
 
 # === Логирование всех апдейтов
 @dp.update.outer_middleware()
 async def log_incoming_updates(handler, event, data):
-    logger.info(f"📥 Получен апдейт: {event}")
+    logger.debug(f"📥 [Update] Тип: {type(event)} | Содержимое: {event}")
     return await handler(event, data)
 
-# === Webhook хуки ===
+# === Webhook хуки
 async def on_startup(bot: Bot):
     logger.info("🚀 on_startup...")
     try:
@@ -79,7 +89,7 @@ async def on_shutdown(bot: Bot):
     except Exception as e:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === Создание AIOHTTP приложения ===
+# === AIOHTTP
 async def create_app():
     logger.info("🔧 Создаю AIOHTTP приложение...")
     app = web.Application()
@@ -90,7 +100,7 @@ async def create_app():
     logger.info("📡 Webhook обработчик активен")
     return app
 
-# === Точка входа ===
+# === Запуск
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
