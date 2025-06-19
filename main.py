@@ -15,26 +15,27 @@ from add_job import router as add_job_router
 from actions import router as actions_router
 from logger_middleware import GlobalLoggerMiddleware
 
+# === Логирование ===
+logging.basicConfig(level=logging.INFO, format="📘 [%(asctime)s] [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
+
 # === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
-
-if not WEBHOOK_HOST:
-    raise ValueError("❌ WEBHOOK_HOST не задан в переменных окружения")
-
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-# === Проверка токена ===
+# === Проверка переменных ===
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN не найден в .env или переменных окружения")
+    logger.critical("❌ BOT_TOKEN не найден в .env или переменных окружения!")
+    raise ValueError("❌ BOT_TOKEN не найден!")
 
-# === Настройка логов ===
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+if not WEBHOOK_HOST:
+    logger.critical("❌ WEBHOOK_HOST не найден в .env или переменных окружения!")
+    raise ValueError("❌ WEBHOOK_HOST не найден!")
 
-# === Создание бота и диспетчера ===
+# === Инициализация бота и диспетчера ===
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -49,31 +50,40 @@ dp.include_router(actions_router)
 # === Middleware ===
 dp.message.middleware(GlobalLoggerMiddleware())
 
-# === Webhook: запуск и остановка ===
-async def on_startup(dispatcher: Dispatcher, bot: Bot):
+# === Функции запуска и остановки ===
+async def on_startup(bot: Bot):
+    logger.info("🚀 Стартую on_startup...")
     await bot.set_webhook(WEBHOOK_URL)
     logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-
-async def on_shutdown(dispatcher: Dispatcher, bot: Bot):
-    await bot.delete_webhook()
     try:
-        await bot.session.close()
+        await bot.send_message(chat_id=853076774, text="✅ Бот запущен и webhook установлен!")
     except Exception as e:
-        logger.warning(f"⚠️ Ошибка при закрытии сессии: {e}")
-    logger.info("🛑 Webhook удалён и сессия закрыта")
+        logger.warning(f"⚠️ Не удалось отправить сообщение о запуске: {e}")
 
-# === Основной запуск ===
+async def on_shutdown(bot: Bot):
+    logger.info("🛑 Остановка... Удаляю webhook и закрываю сессию")
+    await bot.delete_webhook()
+    await bot.session.close()
+    logger.info("✅ Webhook удалён и сессия закрыта")
+
+# === Создание приложения ===
 async def create_app():
+    logger.info("🔧 Создаю AIOHTTP приложение...")
     app = web.Application()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
-    logger.info("🚀 Бот с webhook запущен!")
+    logger.info("📡 Webhook обработчик готов")
     return app
 
+# === Точка входа ===
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app = asyncio.run(create_app())
-    web.run_app(app, port=port)
+    try:
+        port = int(os.environ.get("PORT", 10000))
+        logger.info(f"🌐 Запускаю приложение на порту {port}")
+        app = asyncio.run(create_app())
+        web.run_app(app, port=port)
+    except Exception as e:
+        logger.exception(f"❌ Ошибка при запуске: {e}")
 else:
     app = create_app()
