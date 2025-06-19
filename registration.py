@@ -1,3 +1,4 @@
+import logging
 from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import State, StatesGroup
@@ -7,7 +8,10 @@ import json
 import os
 from datetime import datetime
 
-# 💡 Клавиатура, если menu_keyboard недоступен как модуль
+# Логгер
+logger = logging.getLogger(__name__)
+
+# 💡 Локальная клавиатура
 menu_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📋 Мои подработки")],
@@ -23,7 +27,6 @@ USERS_FILE = "users.json"
 STATS_FILE = "stats.json"
 LOG_FILE = "actions.log"
 
-# === Работа с пользователями ===
 def load_users():
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r", encoding="utf-8") as f:
@@ -57,15 +60,14 @@ def write_log(text):
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}\n")
 
-# === Состояния FSM ===
 class Registration(StatesGroup):
     role = State()
     city = State()
     contact = State()
 
-# === Обработка /start ===
 @router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
+    logger.info(f"[START] Получен /start от {message.from_user.id}")
     write_log(f"[START] {message.from_user.id} начал регистрацию")
     await message.answer(
         "👋 Привет! Я Joby — бот подработок.\n\nВыберите действие:",
@@ -80,9 +82,9 @@ async def start(message: Message, state: FSMContext):
     )
     await state.set_state(Registration.role)
 
-# === Обработка выбора роли ===
 @router.message(Registration.role)
 async def get_role(message: Message, state: FSMContext):
+    logger.info(f"[ROLE] Выбор роли от {message.from_user.id}: {message.text}")
     role = None
     if "найти" in message.text.lower():
         role = "исполнитель"
@@ -114,9 +116,9 @@ async def get_role(message: Message, state: FSMContext):
     await message.answer("🏙 Введите ваш город:")
     await state.set_state(Registration.city)
 
-# === Обработка города ===
 @router.message(Registration.city)
 async def get_city(message: Message, state: FSMContext):
+    logger.info(f"[CITY] Ввод города от {message.from_user.id}: {message.text}")
     await state.update_data(city=message.text)
     username = message.from_user.username
     if username:
@@ -132,9 +134,9 @@ async def get_city(message: Message, state: FSMContext):
         await message.answer("📞 Введите контакт для связи (номер телефона или @username):")
         await state.set_state(Registration.contact)
 
-# === Обработка контакта ===
 @router.message(Registration.contact)
 async def get_contact(message: Message, state: FSMContext):
+    logger.info(f"[CONTACT] Ввод контакта от {message.from_user.id}: {message.text}")
     await state.update_data(contact=message.text)
     data = await state.get_data()
     save_user(message.from_user.id, data)
