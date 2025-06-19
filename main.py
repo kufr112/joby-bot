@@ -25,7 +25,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-IS_PROD = os.getenv("IS_PROD", "1") == "1"  # по умолчанию включено
+IS_PROD = os.getenv("IS_PROD", "1") == "1"
 
 # === Проверка переменных ===
 if not BOT_TOKEN:
@@ -83,6 +83,7 @@ if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
         logger.info(f"🌐 Запускаю на порту {port}")
-        asyncio.run(web._run_app(await create_app(), port=port))  # <-- правильно await
+        app = asyncio.run(create_app())  # <--- без await
+        web.run_app(app, port=port)
     except Exception as e:
         logger.exception(f"❌ Ошибка запуска: {e}")
