@@ -20,6 +20,10 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
+
+if not WEBHOOK_HOST:
+    raise ValueError("❌ WEBHOOK_HOST не задан в переменных окружения")
+
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # === Проверка токена ===
@@ -46,13 +50,16 @@ dp.include_router(actions_router)
 dp.message.middleware(GlobalLoggerMiddleware())
 
 # === Webhook: запуск и остановка ===
-async def on_startup(bot: Bot):
+async def on_startup(dispatcher: Dispatcher, bot: Bot):
     await bot.set_webhook(WEBHOOK_URL)
     logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
 
-async def on_shutdown(bot: Bot):
+async def on_shutdown(dispatcher: Dispatcher, bot: Bot):
     await bot.delete_webhook()
-    await bot.session.close()  # 💡 Это устраняет предупреждение об открытой сессии
+    try:
+        await bot.session.close()
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка при закрытии сессии: {e}")
     logger.info("🛑 Webhook удалён и сессия закрыта")
 
 # === Основной запуск ===
@@ -65,7 +72,7 @@ async def create_app():
     return app
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # Render передаёт PORT в переменной окружения
+    port = int(os.environ.get("PORT", 10000))
     app = asyncio.run(create_app())
     web.run_app(app, port=port)
 else:
