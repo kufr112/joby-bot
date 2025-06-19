@@ -1,7 +1,5 @@
-import asyncio
 import logging
 import os
-
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -76,14 +74,5 @@ async def create_app():
     logger.info("📡 Webhook обработчик готов")
     return app
 
-# === Точка входа ===
-if __name__ == "__main__":
-    try:
-        port = int(os.environ.get("PORT", 10000))
-        logger.info(f"🌐 Запускаю приложение на порту {port}")
-        app = asyncio.run(create_app())
-        web.run_app(app, port=port)
-    except Exception as e:
-        logger.exception(f"❌ Ошибка при запуске: {e}")
-else:
-    app = create_app()
+# === Render ожидает переменную app ===
+app = create_app()
