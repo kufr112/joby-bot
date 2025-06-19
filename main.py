@@ -1,40 +1,52 @@
-import os
+import asyncio
 import logging
+import os
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Update
+from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from fastapi import FastAPI
+from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
+from aiohttp import web
 from dotenv import load_dotenv
 
-from handlers import router  # если у тебя другой файл — поправь название
+from registration import router as registration_router
+from add_job import router as add_job_router
+from actions import router as actions_router
+from logger_middleware import GlobalLoggerMiddleware
 
+# Загружаем .env
 load_dotenv()
-TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_PATH = f"/webhook/{TOKEN}"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL") + WEBHOOK_PATH
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+# Создаём бота и диспетчер
+bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(storage=MemoryStorage())
-dp.include_router(router)
+dp.include_router(registration_router)
+dp.include_router(add_job_router)
+dp.include_router(actions_router)
+dp.message.middleware(GlobalLoggerMiddleware())
 
-app = FastAPI()
-
-logging.basicConfig(level=logging.INFO)
-
-@app.on_event("startup")
-async def on_startup():
+async def on_startup(bot: Bot):
     await bot.set_webhook(WEBHOOK_URL)
-    logging.info(f"Webhook установлен: {WEBHOOK_URL}")
 
-@app.on_event("shutdown")
-async def on_shutdown():
+async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
-    logging.info("Webhook удалён")
 
-@app.post(WEBHOOK_PATH)
-async def telegram_webhook(update: dict):
-    telegram_update = Update.model_validate(update)
-    await dp.feed_update(bot, telegram_update)
-    return {"ok": True}
+async def main():
+    app = web.Application()
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    # Подключаем aiogram к aiohttp
+    setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
+
+    logging.basicConfig(level=logging.INFO)
+    print("🚀 Бот с webhook запущен!")
+
+    return app
+
+if __name__ == "__main__":
+    web.run_app(main(), host="0.0.0.0", port=10000)
