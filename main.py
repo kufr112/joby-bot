@@ -25,14 +25,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+IS_PROD = os.getenv("IS_PROD", "1") == "1"  # по умолчанию включено
 
 # === Проверка переменных ===
 if not BOT_TOKEN:
-    logger.critical("❌ BOT_TOKEN не найден в .env или переменных окружения!")
+    logger.critical("❌ BOT_TOKEN не найден!")
     raise ValueError("❌ BOT_TOKEN не найден!")
 
 if not WEBHOOK_HOST:
-    logger.critical("❌ WEBHOOK_HOST не найден в .env или переменных окружения!")
+    logger.critical("❌ WEBHOOK_HOST не найден!")
     raise ValueError("❌ WEBHOOK_HOST не найден!")
 
 # === Инициализация бота и диспетчера ===
@@ -50,18 +51,19 @@ dp.include_router(actions_router)
 # === Middleware ===
 dp.message.middleware(GlobalLoggerMiddleware())
 
-# === Функции запуска и остановки ===
+# === Хуки запуска и остановки ===
 async def on_startup(bot: Bot):
-    logger.info("🚀 Стартую on_startup...")
+    logger.info("🚀 on_startup...")
     await bot.set_webhook(WEBHOOK_URL)
     logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-    try:
-        await bot.send_message(chat_id=853076774, text="✅ Бот запущен и webhook установлен!")
-    except Exception as e:
-        logger.warning(f"⚠️ Не удалось отправить сообщение о запуске: {e}")
+    if IS_PROD:
+        try:
+            await bot.send_message(chat_id=853076774, text="✅ Бот запущен и webhook установлен!")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отправить сообщение: {e}")
 
 async def on_shutdown(bot: Bot):
-    logger.info("🛑 Остановка... Удаляю webhook и закрываю сессию")
+    logger.info("🛑 Остановка... удаляю webhook")
     await bot.delete_webhook()
     await bot.session.close()
     logger.info("✅ Webhook удалён и сессия закрыта")
@@ -80,7 +82,7 @@ async def create_app():
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
-        logger.info(f"🌐 Запускаю приложение на порту {port}")
-        asyncio.run(web._run_app(create_app(), port=port))  # <-- правильный запуск
+        logger.info(f"🌐 Запускаю на порту {port}")
+        asyncio.run(web._run_app(await create_app(), port=port))  # <-- правильно await
     except Exception as e:
-        logger.exception(f"❌ Ошибка при запуске: {e}")
+        logger.exception(f"❌ Ошибка запуска: {e}")
