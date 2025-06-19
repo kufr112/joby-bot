@@ -19,7 +19,7 @@ from logger_middleware import GlobalLoggerMiddleware
 logging.basicConfig(level=logging.INFO, format="📘 [%(asctime)s] [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# === Загрузка переменных окружения ===
+# === Загрузка .env ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
@@ -27,31 +27,28 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 IS_PROD = os.getenv("IS_PROD", "1") == "1"
 
-# === Проверка переменных ===
+# === Проверка
 if not BOT_TOKEN:
-    logger.critical("❌ BOT_TOKEN не найден!")
     raise ValueError("❌ BOT_TOKEN не найден!")
-
 if not WEBHOOK_HOST:
-    logger.critical("❌ WEBHOOK_HOST не найден!")
     raise ValueError("❌ WEBHOOK_HOST не найден!")
 
-# === Инициализация бота и диспетчера ===
+# === Инициализация
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher(storage=MemoryStorage())
 
-# === Подключение роутеров ===
+# === Роутеры
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
 
-# === Middleware ===
+# === Middleware
 dp.message.middleware(GlobalLoggerMiddleware())
 
-# === Хуки запуска и остановки ===
+# === Webhook
 async def on_startup(bot: Bot):
     logger.info("🚀 on_startup...")
     await bot.set_webhook(WEBHOOK_URL)
@@ -68,26 +65,20 @@ async def on_shutdown(bot: Bot):
     await bot.session.close()
     logger.info("✅ Webhook удалён и сессия закрыта")
 
-# === Создание приложения ===
+# === AIOHTTP app
 async def create_app():
     logger.info("🔧 Создаю AIOHTTP приложение...")
     app = web.Application()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # === Временный отладочный обработчик /webhook
-    async def handle_webhook_debug(request):
-        body = await request.text()
-        logger.warning(f"📩 Получен запрос от Telegram: {body}")
-        return web.Response(text="OK")
-
-    app.router.add_post(WEBHOOK_PATH, handle_webhook_debug)
+    # ⚠️ Удалено: app.router.add_post(WEBHOOK_PATH, handle_webhook_debug)
 
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
-    logger.info("📡 Webhook обработчик готов")
+    logger.info("📡 Webhook обработчик активен")
     return app
 
-# === Точка входа ===
+# === Запуск
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
