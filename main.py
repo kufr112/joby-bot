@@ -51,7 +51,7 @@ async def on_shutdown(bot: Bot):
     logger.info("🛑 Webhook удалён")
 
 # === Основной запуск ===
-async def main():
+async def create_app():
     app = web.Application()
 
     dp.startup.register(on_startup)
@@ -62,8 +62,5 @@ async def main():
     logger.info("🚀 Бот с webhook запущен!")
     return app
 
-if __name__ == "__main__":
-    try:
-        web.run_app(main(), host="0.0.0.0", port=10000)
-    except Exception as e:
-        logger.error(f"❌ Ошибка при запуске бота: {e}")
+# Для Render нужен именно create_app()
+app = asyncio.run(create_app()) if __name__ == "__main__" else create_app()
