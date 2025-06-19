@@ -52,7 +52,7 @@ class Registration(StatesGroup):
     city = State()
     contact = State()
 
-@router.message(F.text == "/start")
+@router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
     write_log(f"[START] {message.from_user.id} начал регистрацию")
     await message.answer(
