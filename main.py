@@ -74,6 +74,15 @@ async def create_app():
     app = web.Application()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+
+    # === Временный отладочный обработчик /webhook
+    async def handle_webhook_debug(request):
+        body = await request.text()
+        logger.warning(f"📩 Получен запрос от Telegram: {body}")
+        return web.Response(text="OK")
+
+    app.router.add_post(WEBHOOK_PATH, handle_webhook_debug)
+
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     logger.info("📡 Webhook обработчик готов")
     return app
@@ -83,7 +92,7 @@ if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
         logger.info(f"🌐 Запускаю на порту {port}")
-        app = asyncio.run(create_app())  # <--- без await
+        app = asyncio.run(create_app())
         web.run_app(app, port=port)
     except Exception as e:
         logger.exception(f"❌ Ошибка запуска: {e}")
