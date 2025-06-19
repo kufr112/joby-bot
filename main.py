@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
+from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 from dotenv import load_dotenv
 
@@ -30,7 +31,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # === Создание бота и диспетчера ===
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher(storage=MemoryStorage())
 
 # === Подключение роутеров ===
@@ -53,12 +57,9 @@ async def on_shutdown(bot: Bot):
 # === Основной запуск ===
 async def create_app():
     app = web.Application()
-
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
-
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
-
     logger.info("🚀 Бот с webhook запущен!")
     return app
 
