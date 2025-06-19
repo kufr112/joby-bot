@@ -63,5 +63,9 @@ async def create_app():
     logger.info("🚀 Бот с webhook запущен!")
     return app
 
-# Для Render нужен именно create_app()
-app = asyncio.run(create_app()) if __name__ == "__main__" else create_app()
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))  # Render передаёт PORT в переменной окружения
+    app = asyncio.run(create_app())
+    web.run_app(app, port=port)
+else:
+    app = create_app()
