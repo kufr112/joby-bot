@@ -31,7 +31,7 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# === Загрузка .env переменных ===
+# === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Пример: https://joby-bot.onrender.com
@@ -46,7 +46,11 @@ if not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env!")
 
 # === Инициализация бота и диспетчера ===
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(
+    token=BOT_TOKEN,
+    parse_mode=ParseMode.HTML,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
 dp = Dispatcher(storage=MemoryStorage())
 
 # === Роутеры ===
@@ -57,38 +61,38 @@ dp.include_router(actions_router)
 # === Middleware ===
 dp.message.middleware(GlobalLoggerMiddleware())
 
-# === Логирование входящих обновлений ===
+# === Лог входящих обновлений ===
 @dp.update.outer_middleware()
 async def log_incoming_updates(handler, event, data):
     logger.debug(f"📥 [Update] Тип: {type(event)} | Содержимое: {event}")
     return await handler(event, data)
 
-# === Запуск при старте (установка webhook и сообщение) ===
+# === Старт — установка webhook и приветствие ===
 async def on_startup(bot: Bot):
     logger.info("🚀 Бот запускается...")
     try:
         await bot.set_webhook(WEBHOOK_URL)
         logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-    except Exception as e:
+    except Exception:
         logger.exception("❌ Не удалось установить webhook")
 
     if IS_PROD and ADMIN_ID:
         try:
             await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен и Webhook активен!")
-        except Exception as e:
+        except Exception:
             logger.warning("⚠️ Не удалось отправить уведомление в Telegram")
 
-# === Остановка (удаление webhook) ===
+# === Остановка сервера — удаление webhook ===
 async def on_shutdown(bot: Bot):
     logger.info("🛑 Остановка бота...")
     try:
         await bot.delete_webhook()
         await bot.session.close()
         logger.info("✅ Webhook удалён, сессия закрыта")
-    except Exception as e:
+    except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === Создание aiohttp приложения ===
+# === AIOHTTP приложение ===
 async def create_app():
     logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
@@ -97,14 +101,14 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Для Render (Gunicorn ищет app в main:app) ===
+# === Для Render: экспорт переменной app ===
 app = asyncio.run(create_app())
 
-# === Запуск сервера локально ===
+# === Локальный запуск (если нужно) ===
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
         logger.info(f"🌍 Запуск приложения на порту {port}")
         web.run_app(app, port=port)
-    except Exception as e:
+    except Exception:
         logger.exception("❌ Ошибка при запуске сервера")
