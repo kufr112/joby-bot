@@ -14,6 +14,7 @@ from add_job import router as add_job_router
 from actions import router as actions_router
 from logger_middleware import GlobalLoggerMiddleware
 
+# === Логирование ===
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter("📘 [%(asctime)s] [%(levelname)s] %(message)s")
@@ -28,6 +29,7 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+# === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
@@ -41,19 +43,23 @@ if not BOT_TOKEN:
 if not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env!")
 
+# === Инициализация бота и диспетчера ===
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
+# === Регистрация роутеров и middleware ===
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
 dp.message.middleware(GlobalLoggerMiddleware())
 
+# === Лог входящих обновлений ===
 @dp.update.outer_middleware()
 async def log_incoming_updates(handler, event, data):
     logger.debug(f"📥 [Update] Тип: {type(event)} | Содержимое: {event}")
     return await handler(event, data)
 
+# === Обработчики запуска и остановки ===
 async def on_startup(bot: Bot):
     logger.info("🚀 Бот запускается...")
     try:
@@ -77,6 +83,7 @@ async def on_shutdown(bot: Bot):
     except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
+# === Создание AIOHTTP приложения ===
 async def create_app():
     logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
@@ -85,4 +92,5 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-app = create_app
+# ✅ Вызов функции, а не просто ссылка
+app = web.run_app(await create_app()) if __name__ == "__main__" else create_app()
