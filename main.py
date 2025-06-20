@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 
@@ -33,7 +32,7 @@ logger.addHandler(console_handler)
 # === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Пример: https://joby-bot.onrender.com
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -44,7 +43,7 @@ if not BOT_TOKEN:
 if not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env!")
 
-# === Инициализация бота и диспетчера ===
+# === Бот и диспетчер ===
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
@@ -65,7 +64,7 @@ async def log_incoming_updates(handler, event, data):
     logger.debug(f"📥 [Update] Тип: {type(event)} | Содержимое: {event}")
     return await handler(event, data)
 
-# === Старт — установка webhook и приветствие ===
+# === Хуки ===
 async def on_startup(bot: Bot):
     logger.info("🚀 Бот запускается...")
     try:
@@ -80,7 +79,6 @@ async def on_startup(bot: Bot):
         except Exception:
             logger.warning("⚠️ Не удалось отправить уведомление в Telegram")
 
-# === Остановка сервера — удаление webhook ===
 async def on_shutdown(bot: Bot):
     logger.info("🛑 Остановка бота...")
     try:
@@ -90,7 +88,7 @@ async def on_shutdown(bot: Bot):
     except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === AIOHTTP приложение ===
+# === AIOHTTP Приложение ===
 async def create_app():
     logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
@@ -99,15 +97,5 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Для Render: async точка входа ===
-async def app():
-    return await create_app()
-
-# === Локальный запуск ===
-if __name__ == "__main__":
-    try:
-        port = int(os.environ.get("PORT", 10000))
-        logger.info(f"🌍 Запуск приложения на порту {port}")
-        web.run_app(asyncio.run(create_app()), port=port)
-    except Exception:
-        logger.exception("❌ Ошибка при запуске сервера")
+# === Для Render: точка входа ===
+app = create_app
