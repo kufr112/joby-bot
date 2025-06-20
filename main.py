@@ -48,7 +48,6 @@ if not WEBHOOK_HOST:
 # === Инициализация бота и диспетчера ===
 bot = Bot(
     token=BOT_TOKEN,
-    parse_mode=ParseMode.HTML,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher(storage=MemoryStorage())
