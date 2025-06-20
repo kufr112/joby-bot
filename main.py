@@ -1,6 +1,5 @@
 import logging
 import os
-import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -15,11 +14,10 @@ from add_job import router as add_job_router
 from actions import router as actions_router
 from logger_middleware import GlobalLoggerMiddleware
 
-# === Логирование ===
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-
 formatter = logging.Formatter("📘 [%(asctime)s] [%(levelname)s] %(message)s")
+
 file_handler = logging.FileHandler("full_debug.log", encoding="utf-8")
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
@@ -30,7 +28,6 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
@@ -44,28 +41,19 @@ if not BOT_TOKEN:
 if not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env!")
 
-# === Бот и диспетчер ===
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
-# === Роутеры ===
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
-
-# === Middleware ===
 dp.message.middleware(GlobalLoggerMiddleware())
 
-# === Лог входящих обновлений ===
 @dp.update.outer_middleware()
 async def log_incoming_updates(handler, event, data):
     logger.debug(f"📥 [Update] Тип: {type(event)} | Содержимое: {event}")
     return await handler(event, data)
 
-# === Хуки ===
 async def on_startup(bot: Bot):
     logger.info("🚀 Бот запускается...")
     try:
@@ -89,8 +77,7 @@ async def on_shutdown(bot: Bot):
     except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === Асинхронная функция создания приложения ===
-async def create_web_app():
+async def create_app():
     logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
     dp.startup.register(on_startup)
@@ -98,6 +85,4 @@ async def create_web_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Для Render: точка входа ===
-def create_app():
-    return asyncio.run(create_web_app())
+app = create_app
