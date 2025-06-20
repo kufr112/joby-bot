@@ -92,9 +92,15 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Запуск локально или экспорт в Gunicorn ===
+# === Поддержка Gunicorn и локального запуска ===
+app = None
+
+async def init_app():
+    global app
+    app = await create_app()
+    return app
+
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(web._run_app(create_app()))
-else:
-    app = create_app()
+    asyncio.run(init_app())
+    web.run_app(app)
