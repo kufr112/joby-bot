@@ -92,5 +92,9 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# ✅ Вызов функции, а не просто ссылка
-app = web.run_app(await create_app()) if __name__ == "__main__" else create_app()
+# === Запуск локально или экспорт в Gunicorn ===
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(web._run_app(create_app()))
+else:
+    app = create_app()
