@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -88,8 +89,8 @@ async def on_shutdown(bot: Bot):
     except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === AIOHTTP Приложение ===
-async def create_app():
+# === Асинхронная функция создания приложения ===
+async def create_web_app():
     logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
     dp.startup.register(on_startup)
@@ -98,4 +99,5 @@ async def create_app():
     return app
 
 # === Для Render: точка входа ===
-app = create_app
+def create_app():
+    return asyncio.run(create_web_app())
