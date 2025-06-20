@@ -34,7 +34,8 @@ logger.addHandler(console_handler)
 # === Загрузка .env переменных ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # пример: https://bot-name.onrender.com
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Пример: https://joby-bot.onrender.com
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 IS_PROD = os.getenv("IS_PROD", "1") == "1"
@@ -71,9 +72,9 @@ async def on_startup(bot: Bot):
     except Exception as e:
         logger.exception("❌ Не удалось установить webhook")
 
-    if IS_PROD:
+    if IS_PROD and ADMIN_ID:
         try:
-            await bot.send_message(chat_id=853076774, text="✅ Бот запущен и Webhook активен!")
+            await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен и Webhook активен!")
         except Exception as e:
             logger.warning("⚠️ Не удалось отправить уведомление в Telegram")
 
