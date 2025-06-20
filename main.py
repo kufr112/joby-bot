@@ -36,7 +36,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Пример: https://joby-bot.onrender.com
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-WEBHOOK_URL = WEBHOOK_HOST  # ⛔️ Без пути!
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 IS_PROD = os.getenv("IS_PROD", "1") == "1"
 
 if not BOT_TOKEN:
@@ -93,7 +94,7 @@ async def create_app():
     app = web.Application()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
-    setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot)  # ⛔️ Без path=
+    setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
 # === Запуск сервера ===
