@@ -99,9 +99,9 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Для Render: точка входа ===
-def run():
-    return asyncio.run(create_app())
+# === Для Render: async точка входа ===
+async def app():
+    return await create_app()
 
 # === Локальный запуск ===
 if __name__ == "__main__":
