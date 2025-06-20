@@ -20,7 +20,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter("📘 [%(asctime)s] [%(levelname)s] %(message)s")
-
 file_handler = logging.FileHandler("full_debug.log", encoding="utf-8")
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
@@ -100,14 +99,15 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Для Render: экспорт переменной app ===
-app = asyncio.run(create_app())
+# === Для Render: точка входа ===
+def run():
+    return asyncio.run(create_app())
 
-# === Локальный запуск (если нужно) ===
+# === Локальный запуск ===
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
         logger.info(f"🌍 Запуск приложения на порту {port}")
-        web.run_app(app, port=port)
+        web.run_app(asyncio.run(create_app()), port=port)
     except Exception:
         logger.exception("❌ Ошибка при запуске сервера")
