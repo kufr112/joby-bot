@@ -97,12 +97,14 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Запуск сервера ===
+# === Для Render (Gunicorn ищет app в main:app) ===
+app = asyncio.run(create_app())
+
+# === Запуск сервера локально ===
 if __name__ == "__main__":
     try:
         port = int(os.environ.get("PORT", 10000))
         logger.info(f"🌍 Запуск приложения на порту {port}")
-        app = asyncio.run(create_app())
         web.run_app(app, port=port)
     except Exception as e:
         logger.exception("❌ Ошибка при запуске сервера")
