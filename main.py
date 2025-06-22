@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -92,15 +93,9 @@ async def create_app():
     setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
     return app
 
-# === Поддержка Gunicorn и локального запуска ===
-app = None
+# === Инициализация приложения для Gunicorn ===
+app = asyncio.run(create_app())
 
-async def init_app():
-    global app
-    app = await create_app()
-    return app
-
+# === Локальный запуск (если не через Gunicorn) ===
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(init_app())
     web.run_app(app)
