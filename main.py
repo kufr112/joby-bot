@@ -5,7 +5,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 from dotenv import load_dotenv
@@ -61,21 +61,17 @@ async def log_incoming_updates(handler, event, data):
     return await handler(event, data)
 
 # === Обработчики запуска и остановки ===
-async def on_startup(bot: Bot):
+async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
-    try:
-        await bot.set_webhook(WEBHOOK_URL)
-        logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-    except Exception:
-        logger.exception("❌ Не удалось установить webhook")
-
+    await bot.set_webhook(WEBHOOK_URL)
+    logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
     if IS_PROD and ADMIN_ID:
         try:
             await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен и Webhook активен!")
         except Exception:
             logger.warning("⚠️ Не удалось отправить уведомление в Telegram")
 
-async def on_shutdown(bot: Bot):
+async def on_shutdown(app: web.Application):
     logger.info("🛑 Остановка бота...")
     try:
         await bot.delete_webhook()
@@ -84,18 +80,18 @@ async def on_shutdown(bot: Bot):
     except Exception:
         logger.exception("❌ Ошибка при удалении webhook")
 
-# === Создание AIOHTTP приложения ===
+# === AIOHTTP приложение ===
 async def create_app():
-    logger.info("🔧 Создание AIOHTTP приложения...")
     app = web.Application()
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-    setup_application(app, dp, handle_class=SimpleRequestHandler, bot=bot, path=WEBHOOK_PATH)
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    # Явная регистрация webhook handler
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     return app
 
-# === Инициализация приложения для Gunicorn ===
+# === Поддержка Gunicorn ===
 app = asyncio.run(create_app())
 
-# === Локальный запуск (если не через Gunicorn) ===
+# === Локальный запуск ===
 if __name__ == "__main__":
     web.run_app(app)
