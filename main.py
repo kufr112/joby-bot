@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from registration import router as registration_router
 from add_job import router as add_job_router
 from actions import router as actions_router
+from handlers import router as handlers_router  # 👈 Новый хендлер
 from logger_middleware import GlobalLoggerMiddleware
 
 # === Логирование ===
@@ -49,6 +50,7 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 dp = Dispatcher(storage=MemoryStorage())
 
 # === Регистрация роутеров и middleware ===
+dp.include_router(handlers_router)
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
