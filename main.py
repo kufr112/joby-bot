@@ -63,35 +63,39 @@ async def log_incoming_updates(handler, event, data):
 # === Обработчики запуска и остановки ===
 async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
-    await bot.set_webhook(WEBHOOK_URL)
-    logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+    try:
+        await bot.set_webhook(WEBHOOK_URL)
+        logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+    except Exception:
+        logger.exception("❌ Не удалось установить webhook")
+
     if IS_PROD and ADMIN_ID:
         try:
             await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен и Webhook активен!")
         except Exception:
-            logger.warning("⚠️ Не удалось отправить уведомление в Telegram")
+            logger.warning("⚠️ Не удалось отправить сообщение админу")
 
 async def on_shutdown(app: web.Application):
     logger.info("🛑 Остановка бота...")
     try:
         await bot.delete_webhook()
         await bot.session.close()
-        logger.info("✅ Webhook удалён, сессия закрыта")
+        logger.info("✅ Webhook удалён и сессия закрыта")
     except Exception:
-        logger.exception("❌ Ошибка при удалении webhook")
+        logger.exception("❌ Ошибка при остановке")
 
-# === AIOHTTP приложение ===
+# === Создание aiohttp-приложения ===
 async def create_app():
+    logger.info("🔧 Инициализация AIOHTTP приложения")
     app = web.Application()
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
-    # Явная регистрация webhook handler
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     return app
 
-# === Поддержка Gunicorn ===
+# === Приложение для Gunicorn (Render) ===
 app = asyncio.run(create_app())
 
-# === Локальный запуск ===
+# === Локальный запуск (если нужно) ===
 if __name__ == "__main__":
     web.run_app(app)
