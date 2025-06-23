@@ -2,61 +2,48 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-import json
-import os
 from datetime import datetime
-
 from keyboards import menu_keyboard
-from registration import load_users, save_user, update_stats, write_log  # подключаем нужные функции
+from supabase import create_client
+import os
+from dotenv import load_dotenv
+
+# === Supabase ===
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 router = Router()
 
-JOBS_FILE = "jobs.json"
-LOG_FILE = "actions.log"
-
-# 💼 Состояния FSM для пошагового ввода подработки
+# 💼 Состояния FSM
 class AddJob(StatesGroup):
     title = State()
     description = State()
     price = State()
 
-# 📂 Загрузка и сохранение подработок
-def load_jobs():
-    if os.path.exists(JOBS_FILE):
-        with open(JOBS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_job(job):
-    jobs = load_jobs()
-    jobs.append(job)
-    with open(JOBS_FILE, "w", encoding="utf-8") as f:
-        json.dump(jobs, f, ensure_ascii=False, indent=2)
-    write_log(f"[JOB] Новая подработка от {job['user_id']} — {job['title']} ({job['price']} руб.)")
-
-# 🚀 Обработка команды "Разместить подработку"
+# 🚀 Старт добавления подработки
 @router.message(lambda m: "разместить подработку" in m.text.lower())
 async def start_add_job(message: Message, state: FSMContext):
     user_id = str(message.from_user.id)
-    users = load_users()
-    user = users.get(user_id)
 
-    # 🧠 Если пользователь не существует — создать его с ролью "заказчик"
-    if not user:
-        user = {
+    # Проверка существования пользователя
+    result = supabase.table("users").select("*").eq("id", user_id).execute()
+    if not result.data:
+        # Автоматическая регистрация
+        new_user = {
+            "id": user_id,
             "roles": ["заказчик"],
             "city": "Не указан",
-            "contact": f"@{message.from_user.username}" if message.from_user.username else "Не указан"
+            "contact": f"@{message.from_user.username}" if message.from_user.username else "Не указан",
+            "created_at": datetime.utcnow().isoformat()
         }
-        save_user(user_id, user)
-        update_stats("заказчик")
-        write_log(f"[REG-AUTO] {user_id} зарегистрирован как заказчик (через размещение)")
-    # 🔄 Если есть, но нет роли — добавить роль "заказчик"
-    elif "заказчик" not in user.get("roles", []):
-        user["roles"].append("заказчик")
-        save_user(user_id, user)
-        update_stats("заказчик")
-        write_log(f"[REG-AUTO] {user_id} добавлена роль заказчик (через размещение)")
+        supabase.table("users").insert(new_user).execute()
+    else:
+        roles = result.data[0].get("roles", [])
+        if "заказчик" not in roles:
+            roles.append("заказчик")
+            supabase.table("users").update({"roles": roles}).eq("id", user_id).execute()
 
     await message.answer("✏️ Введите заголовок подработки (например: 'Помощь на складе'):")
     await state.set_state(AddJob.title)
@@ -87,20 +74,23 @@ async def get_price(message: Message, state: FSMContext):
     await state.update_data(price=price_text)
     data = await state.get_data()
 
-    users = load_users()
-    user = users.get(str(message.from_user.id), {})
+    # Получаем контакт и город пользователя из Supabase
+    user_id = str(message.from_user.id)
+    user_data = supabase.table("users").select("city,contact").eq("id", user_id).execute()
+    user = user_data.data[0] if user_data.data else {}
 
     job = {
-        "user_id": message.from_user.id,
+        "user_id": user_id,
         "title": data["title"],
         "description": data["description"],
         "price": data["price"],
         "city": user.get("city", "Не указан"),
         "contact": user.get("contact", "Не указан"),
-        "timestamp": datetime.now().isoformat()
+        "created_at": datetime.utcnow().isoformat()
     }
 
-    save_job(job)
+    # Сохраняем подработку в Supabase
+    supabase.table("jobs").insert(job).execute()
 
     await message.answer(
         f"✅ <b>Подработка размещена!</b>\n\n"
