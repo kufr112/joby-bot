@@ -1,17 +1,25 @@
 import logging
-from aiogram import Router, F
+import os
+from datetime import datetime
+
+from aiogram import Router
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
-import json
-import os
-from datetime import datetime
+from supabase import create_client
+from dotenv import load_dotenv
 
-# Логгер
+# === Логгер ===
 logger = logging.getLogger(__name__)
 
-# 💡 Локальная клавиатура
+# === Supabase ===
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# === Клавиатура меню ===
 menu_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📋 Мои подработки")],
@@ -23,48 +31,37 @@ menu_keyboard = ReplyKeyboardMarkup(
 
 router = Router()
 
-USERS_FILE = "users.json"
-STATS_FILE = "stats.json"
-LOG_FILE = "actions.log"
-
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                return {}
-    return {}
-
-def save_user(user_id, data):
-    users = load_users()
-    users[str(user_id)] = data
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
-
-def update_stats(new_role):
-    stats = {"total": 0, "исполнитель": 0, "заказчик": 0}
-    if os.path.exists(STATS_FILE):
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            try:
-                stats = json.load(f)
-            except json.JSONDecodeError:
-                pass
-    stats["total"] += 1
-    if new_role in stats:
-        stats[new_role] += 1
-    with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f, ensure_ascii=False, indent=2)
-
-def write_log(text):
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {text}\n")
-
+# === FSM Состояния ===
 class Registration(StatesGroup):
     role = State()
     city = State()
     contact = State()
 
+# === Supabase-функции ===
+def save_user(user_id, data):
+    existing = supabase.table("users").select("telegram_id").eq("telegram_id", user_id).execute()
+    if existing.data:
+        supabase.table("users").update({
+            "roles": data["roles"],
+            "city": data.get("city"),
+            "contact": data.get("contact")
+        }).eq("telegram_id", user_id).execute()
+    else:
+        supabase.table("users").insert({
+            "telegram_id": user_id,
+            "roles": data["roles"],
+            "city": data.get("city"),
+            "contact": data.get("contact")
+        }).execute()
+
+def get_user(user_id):
+    res = supabase.table("users").select("*").eq("telegram_id", user_id).single().execute()
+    return res.data if res.data else None
+
+def write_log(text):
+    logger.info(text)
+
+# === Обработчики ===
 @router.message(Command("start"))
 async def start(message: Message, state: FSMContext):
     logger.info(f"[START] Получен /start от {message.from_user.id}")
@@ -84,7 +81,6 @@ async def start(message: Message, state: FSMContext):
 
 @router.message(Registration.role)
 async def get_role(message: Message, state: FSMContext):
-    logger.info(f"[ROLE] Выбор роли от {message.from_user.id}: {message.text}")
     role = None
     if "найти" in message.text.lower():
         role = "исполнитель"
@@ -94,9 +90,8 @@ async def get_role(message: Message, state: FSMContext):
         await message.answer("Пожалуйста, выберите один из вариантов кнопками ниже.")
         return
 
-    user_id = str(message.from_user.id)
-    users = load_users()
-    user = users.get(user_id)
+    user_id = message.from_user.id
+    user = get_user(user_id)
 
     if user:
         roles = user.get("roles", [])
@@ -104,7 +99,6 @@ async def get_role(message: Message, state: FSMContext):
             roles.append(role)
             user["roles"] = roles
             save_user(user_id, user)
-            update_stats(role)
             write_log(f"[REG] {user_id} добавил роль {role}")
             await message.answer(f"✅ Роль <b>{role}</b> добавлена к вашему профилю.", reply_markup=menu_keyboard)
         else:
@@ -118,15 +112,12 @@ async def get_role(message: Message, state: FSMContext):
 
 @router.message(Registration.city)
 async def get_city(message: Message, state: FSMContext):
-    logger.info(f"[CITY] Ввод города от {message.from_user.id}: {message.text}")
     await state.update_data(city=message.text)
     username = message.from_user.username
     if username:
         await state.update_data(contact=f"@{username}")
         data = await state.get_data()
         save_user(message.from_user.id, data)
-        for r in data.get("roles", []):
-            update_stats(r)
         write_log(f"[REG] {message.from_user.id} зарегистрировался с ролями {data['roles']}")
         await message.answer("✅ Регистрация завершена!\nТеперь вы можете пользоваться меню.", reply_markup=menu_keyboard)
         await state.clear()
@@ -136,12 +127,9 @@ async def get_city(message: Message, state: FSMContext):
 
 @router.message(Registration.contact)
 async def get_contact(message: Message, state: FSMContext):
-    logger.info(f"[CONTACT] Ввод контакта от {message.from_user.id}: {message.text}")
     await state.update_data(contact=message.text)
     data = await state.get_data()
     save_user(message.from_user.id, data)
-    for r in data.get("roles", []):
-        update_stats(r)
     write_log(f"[REG] {message.from_user.id} зарегистрировался с ролями {data['roles']}")
     await message.answer("✅ Регистрация завершена!\nТеперь вы можете пользоваться меню.", reply_markup=menu_keyboard)
     await state.clear()
