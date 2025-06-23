@@ -9,14 +9,17 @@ from supabase import create_client
 import os
 from dotenv import load_dotenv
 
-# === Supabase ===
+# === Supabase и .env ===
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("❌ Supabase URL или KEY не найдены в переменных окружения!")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # === Логгер ===
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # === Меню-клавиатура ===
 menu_keyboard = ReplyKeyboardMarkup(
@@ -62,23 +65,25 @@ async def get_role(message: Message, state: FSMContext):
     elif "разместить" in message.text.lower():
         role = "заказчик"
     else:
-        await message.answer("Пожалуйста, выберите один из вариантов кнопками ниже.")
+        await message.answer("❗ Пожалуйста, выберите вариант кнопками.")
         return
 
     user_id = str(message.from_user.id)
 
-    # Проверка в базе
-    existing = supabase.table("users").select("roles").eq("id", user_id).execute()
-    if existing.data:
-        roles = existing.data[0].get("roles", [])
-        if role not in roles:
-            roles.append(role)
-            supabase.table("users").update({"roles": roles}).eq("id", user_id).execute()
-            await message.answer(f"✅ Роль <b>{role}</b> добавлена к вашему профилю.", reply_markup=menu_keyboard)
-        else:
-            await message.answer(f"✅ У вас уже есть роль <b>{role}</b>.", reply_markup=menu_keyboard)
-        await state.clear()
-        return
+    try:
+        existing = supabase.table("users").select("roles").eq("id", user_id).execute()
+        if existing.data:
+            roles = existing.data[0].get("roles", [])
+            if role not in roles:
+                roles.append(role)
+                supabase.table("users").update({"roles": roles}).eq("id", user_id).execute()
+                await message.answer(f"✅ Роль <b>{role}</b> добавлена.", reply_markup=menu_keyboard)
+            else:
+                await message.answer(f"✅ У вас уже есть роль <b>{role}</b>.", reply_markup=menu_keyboard)
+            await state.clear()
+            return
+    except Exception as e:
+        logger.exception(f"Ошибка Supabase при проверке роли: {e}")
 
     await state.update_data(roles=[role])
     await message.answer("🏙 Введите ваш город:")
@@ -95,7 +100,7 @@ async def get_city(message: Message, state: FSMContext):
         await message.answer("✅ Регистрация завершена!\nТеперь вы можете пользоваться меню.", reply_markup=menu_keyboard)
         await state.clear()
     else:
-        await message.answer("📞 Введите контакт для связи (номер телефона или @username):")
+        await message.answer("📞 Введите контакт (номер или @username):")
         await state.set_state(Registration.contact)
 
 # === Ввод контакта ===
