@@ -13,8 +13,9 @@ from dotenv import load_dotenv
 from registration import router as registration_router
 from add_job import router as add_job_router
 from actions import router as actions_router
-from handlers import router as handlers_router  # без main_menu
+from handlers import router as handlers_router
 from logger_middleware import GlobalLoggerMiddleware
+from keyboards import menu_keyboard  # ✅ reply-меню снизу
 
 # === Логирование ===
 logger = logging.getLogger()
@@ -55,6 +56,14 @@ dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
 dp.message.middleware(GlobalLoggerMiddleware())
+
+# === /start — показывает только reply-меню снизу
+@dp.message(F.text == "/start")
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "👋 Привет! Добро пожаловать в Joby Bot.\nВыберите действие ниже ⤵️",
+        reply_markup=menu_keyboard
+    )
 
 # === Лог входящих обновлений ===
 @dp.update.outer_middleware()
