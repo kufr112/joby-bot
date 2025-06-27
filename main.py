@@ -13,9 +13,8 @@ from dotenv import load_dotenv
 from registration import router as registration_router
 from add_job import router as add_job_router
 from actions import router as actions_router
-from handlers import router as handlers_router, main_menu
+from handlers import router as handlers_router  # без main_menu
 from logger_middleware import GlobalLoggerMiddleware
-from aiogram.types import ReplyKeyboardRemove
 
 # === Логирование ===
 logger = logging.getLogger()
@@ -56,15 +55,6 @@ dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(actions_router)
 dp.message.middleware(GlobalLoggerMiddleware())
-
-# === /start с удалением reply-клавиатуры ===
-@dp.message(F.text == "/start")
-async def cmd_start(message: types.Message):
-    await message.answer(
-        "👋 Привет! Добро пожаловать в Joby Bot.\nВыбери нужный пункт из меню:",
-        reply_markup=main_menu
-    )
-    await message.answer("Меню обновлено.", reply_markup=ReplyKeyboardRemove())
 
 # === Лог входящих обновлений ===
 @dp.update.outer_middleware()
