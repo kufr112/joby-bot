@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message
-from keyboards import menu_keyboard  # ✅ reply-меню снизу
+from keyboards import menu_keyboard  # reply-клавиатура снизу
 
 router = Router()
 
