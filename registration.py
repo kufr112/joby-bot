@@ -71,9 +71,7 @@ async def get_name(message: Message, state: FSMContext) -> None:
 @router.message(RegisterState.city)
 async def get_city(message: Message, state: FSMContext) -> None:
     await state.update_data(city=message.text.strip())
-    await message.answer(
-        "Укажите ваш номер телефона:", reply_markup=phone_keyboard
-    )
+    await message.answer("Укажите ваш номер телефона:", reply_markup=phone_keyboard)
     await state.set_state(RegisterState.phone)
 
 
@@ -124,7 +122,5 @@ async def get_phone(message: Message, state: FSMContext) -> None:
     except Exception as e:
         logger.exception(f"Failed to save user: {e}")
 
-    await message.answer(
-        "✅ Регистрация завершена!", reply_markup=menu_keyboard
-    )
+    await message.answer("✅ Регистрация завершена!", reply_markup=menu_keyboard)
     await state.clear()

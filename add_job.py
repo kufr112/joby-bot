@@ -6,7 +6,6 @@ from datetime import datetime
 from keyboards import menu_keyboard
 from supabase_client import supabase
 
-
 router = Router()
 
 # 💼 Состояния FSM

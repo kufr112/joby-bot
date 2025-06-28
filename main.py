@@ -97,11 +97,12 @@ async def create_app():
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     return app
 
+# === Инициализация приложения ===
 app = None
 if IS_PROD:
-    # Приложение для Gunicorn (Render)
     app = asyncio.run(create_app())
 
+# === Точка входа ===
 if __name__ == "__main__":
     if IS_PROD:
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
