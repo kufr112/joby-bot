@@ -4,15 +4,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from datetime import datetime
 from keyboards import menu_keyboard
-from supabase import create_client
-import os
-from dotenv import load_dotenv
+from supabase_client import supabase
 
-# === Supabase ===
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 router = Router()
 
