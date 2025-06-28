@@ -98,6 +98,7 @@ async def create_app():
 # === Приложение для Gunicorn (Render) ===
 app = asyncio.run(create_app())
 
-# === Локальный запуск (если нужно) ===
+# === Локальный запуск (только webhook, без polling) ===
+# Render запускает файл через gunicorn, поэтому polling не нужен.
 if __name__ == "__main__":
     web.run_app(app)
