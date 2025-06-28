@@ -1,116 +1,102 @@
 import logging
-from aiogram import Router
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from aiogram.filters import Command
 from datetime import datetime
+
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message
+
+from keyboards import (
+    menu_keyboard,
+    phone_keyboard,
+    register_keyboard,
+    remove_keyboard,
+)
 from supabase_client import supabase
 
-# === Логгер ===
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# === Меню-клавиатура ===
-menu_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="📋 Мои подработки")],
-        [KeyboardButton(text="➕ Добавить подработку")],
-        [KeyboardButton(text="🔍 Найти исполнителя")]
-    ],
-    resize_keyboard=True
-)
 
 router = Router()
 
-# === Состояния ===
-class Registration(StatesGroup):
-    role = State()
+
+class RegisterState(StatesGroup):
+    name = State()
     city = State()
-    contact = State()
+    phone = State()
 
-# === /start ===
-@router.message(Command("start"))
-async def start(message: Message, state: FSMContext):
-    logger.info(f"[START] {message.from_user.id} начал регистрацию")
-    await message.answer(
-        "👋 Привет! Я Joby — бот подработок.\n\nВыберите действие:",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[
-                [KeyboardButton(text="🔍 Хочу найти подработку")],
-                [KeyboardButton(text="➕ Хочу разместить подработку")]
-            ],
-            resize_keyboard=True,
-            one_time_keyboard=True
+
+async def user_exists(telegram_id: int) -> bool:
+    try:
+        data = (
+            supabase.table("users")
+            .select("id")
+            .eq("telegram_id", telegram_id)
+            .execute()
         )
-    )
-    await state.set_state(Registration.role)
+        return bool(data.data)
+    except Exception as e:
+        logger.exception(f"Supabase check failed: {e}")
+        return False
 
-# === Выбор роли ===
-@router.message(Registration.role)
-async def get_role(message: Message, state: FSMContext):
-    role = None
-    if "найти" in message.text.lower():
-        role = "исполнитель"
-    elif "разместить" in message.text.lower():
-        role = "заказчик"
-    else:
-        await message.answer("❗ Пожалуйста, выберите вариант кнопками.")
+
+@router.message(Command("start"))
+async def start_cmd(message: Message, state: FSMContext) -> None:
+    if await user_exists(message.from_user.id):
+        await message.answer("📌 Главное меню:", reply_markup=menu_keyboard)
         return
 
-    user_id = str(message.from_user.id)
-
-    try:
-        existing = supabase.table("users").select("roles").eq("id", user_id).execute()
-        if existing.data:
-            roles = existing.data[0].get("roles", [])
-            if role not in roles:
-                roles.append(role)
-                supabase.table("users").update({"roles": roles}).eq("id", user_id).execute()
-                await message.answer(f"✅ Роль <b>{role}</b> добавлена.", reply_markup=menu_keyboard)
-            else:
-                await message.answer(f"✅ У вас уже есть роль <b>{role}</b>.", reply_markup=menu_keyboard)
-            await state.clear()
-            return
-    except Exception as e:
-        logger.exception(f"Ошибка Supabase при проверке роли: {e}")
-
-    await state.update_data(roles=[role])
-    await message.answer("🏙 Введите ваш город:")
-    await state.set_state(Registration.city)
-
-# === Ввод города ===
-@router.message(Registration.city)
-async def get_city(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
-    username = message.from_user.username
-    if username:
-        await state.update_data(contact=f"@{username}")
-        await save_to_supabase(message.from_user.id, await state.get_data())
-        await message.answer("✅ Регистрация завершена!\nТеперь вы можете пользоваться меню.", reply_markup=menu_keyboard)
-        await state.clear()
-    else:
-        await message.answer("📞 Введите контакт (номер или @username):")
-        await state.set_state(Registration.contact)
-
-# === Ввод контакта ===
-@router.message(Registration.contact)
-async def get_contact(message: Message, state: FSMContext):
-    await state.update_data(contact=message.text)
-    await save_to_supabase(message.from_user.id, await state.get_data())
-    await message.answer("✅ Регистрация завершена!\nТеперь вы можете пользоваться меню.", reply_markup=menu_keyboard)
     await state.clear()
+    text = (
+        "👋 Добро пожаловать в Joby — бот для поиска и размещения подработок!\n"
+        "Давайте начнём с регистрации:"
+    )
+    await message.answer(text, reply_markup=register_keyboard)
 
-# === Сохранение в Supabase ===
-async def save_to_supabase(user_id, data):
+
+@router.message(lambda m: m.text and "зарегистрироваться" in m.text.lower())
+async def registration_start(message: Message, state: FSMContext) -> None:
+    await message.answer("Введите ваше имя:", reply_markup=remove_keyboard)
+    await state.set_state(RegisterState.name)
+
+
+@router.message(RegisterState.name)
+async def get_name(message: Message, state: FSMContext) -> None:
+    await state.update_data(name=message.text.strip())
+    await message.answer("Введите ваш город:")
+    await state.set_state(RegisterState.city)
+
+
+@router.message(RegisterState.city)
+async def get_city(message: Message, state: FSMContext) -> None:
+    await state.update_data(city=message.text.strip())
+    await message.answer(
+        "Укажите ваш номер телефона:", reply_markup=phone_keyboard
+    )
+    await state.set_state(RegisterState.phone)
+
+
+@router.message(RegisterState.phone)
+async def get_phone(message: Message, state: FSMContext) -> None:
+    phone = message.contact.phone_number if message.contact else message.text.strip()
+    await state.update_data(phone=phone)
+    data = await state.get_data()
+
     try:
-        supabase.table("users").insert({
-            "id": str(user_id),
-            "roles": data.get("roles", []),
-            "city": data.get("city"),
-            "contact": data.get("contact"),
-            "created_at": datetime.utcnow().isoformat()
-        }).execute()
-        logger.info(f"[REG] {user_id} зарегистрирован: {data}")
+        supabase.table("users").insert(
+            {
+                "telegram_id": message.from_user.id,
+                "username": message.from_user.username,
+                "name": data["name"],
+                "city": data["city"],
+                "phone": data["phone"],
+                "created_at": datetime.utcnow().isoformat(),
+            }
+        ).execute()
     except Exception as e:
-        logger.exception(f"❌ Ошибка при сохранении в Supabase: {e}")
+        logger.exception(f"Failed to save user: {e}")
+
+    await message.answer(
+        "✅ Регистрация завершена!", reply_markup=menu_keyboard
+    )
+    await state.clear()
