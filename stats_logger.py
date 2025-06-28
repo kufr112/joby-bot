@@ -21,20 +21,19 @@ class StatsLogger:
         cls.path.parent.mkdir(exist_ok=True)
         with cls.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        log_to_supabase("INFO", event, context=data)
+        log_to_supabase("ACTION", event, details=data)
 
 
-def log_to_supabase(level: str, message: str, context: Any | None = None, user_id: int | None = None) -> None:
+def log_to_supabase(type_: str, message: str, details: Any | None = None) -> None:
     """Send a log record to the ``logs`` table in Supabase."""
     try:
         if supabase.dummy:
             return
         entry = {
-            "level": level,
+            "timestamp": datetime.utcnow().isoformat(),
+            "type": type_,
             "message": message,
-            "context": context or {},
-            "user_id": user_id,
-            "created_at": datetime.utcnow().isoformat(),
+            "details": details,
         }
         supabase.table("logs").insert(entry).execute()
     except Exception:
