@@ -34,16 +34,16 @@ logger.addHandler(console_handler)
 # === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+IS_PROD = os.getenv("IS_PROD", "0") == "1"
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-IS_PROD = os.getenv("IS_PROD", "1") == "1"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 
 if not BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN не найден в .env!")
-if not WEBHOOK_HOST:
-    raise ValueError("❌ WEBHOOK_HOST не найден в .env!")
+if IS_PROD and not WEBHOOK_HOST:
+    raise ValueError("❌ WEBHOOK_HOST не найден в .env для продакшена!")
 
 # === Инициализация бота и диспетчера ===
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -65,24 +65,26 @@ async def log_incoming_updates(handler, event, data):
 # === Обработчики запуска и остановки ===
 async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
-    try:
-        await bot.set_webhook(WEBHOOK_URL)
-        logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-    except Exception:
-        logger.exception("❌ Не удалось установить webhook")
-
-    if IS_PROD and ADMIN_ID:
+    if IS_PROD and WEBHOOK_URL:
         try:
-            await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен и Webhook активен!")
+            await bot.set_webhook(WEBHOOK_URL)
+            logger.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+        except Exception:
+            logger.exception("❌ Не удалось установить webhook")
+
+    if ADMIN_ID:
+        try:
+            await bot.send_message(chat_id=ADMIN_ID, text="✅ Бот запущен")
         except Exception:
             logger.warning("⚠️ Не удалось отправить сообщение админу")
 
 async def on_shutdown(app: web.Application):
     logger.info("🛑 Остановка бота...")
     try:
-        await bot.delete_webhook()
+        if IS_PROD:
+            await bot.delete_webhook()
         await bot.session.close()
-        logger.info("✅ Webhook удалён и сессия закрыта")
+        logger.info("✅ Сессия закрыта")
     except Exception:
         logger.exception("❌ Ошибка при остановке")
 
@@ -95,10 +97,13 @@ async def create_app():
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     return app
 
-# === Приложение для Gunicorn (Render) ===
-app = asyncio.run(create_app())
+app = None
+if IS_PROD:
+    # Приложение для Gunicorn (Render)
+    app = asyncio.run(create_app())
 
-# === Локальный запуск (только webhook, без polling) ===
-# Render запускает файл через gunicorn, поэтому polling не нужен.
 if __name__ == "__main__":
-    web.run_app(app)
+    if IS_PROD:
+        web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+    else:
+        asyncio.run(dp.start_polling(bot))

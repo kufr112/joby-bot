@@ -32,7 +32,7 @@ async def user_exists(telegram_id: int) -> bool:
         data = (
             supabase.table("users")
             .select("id")
-            .eq("id", telegram_id)
+            .eq("telegram_id", telegram_id)
             .execute()
         )
         return bool(data.data)
@@ -113,7 +113,7 @@ async def get_phone(message: Message, state: FSMContext) -> None:
     try:
         supabase.table("users").insert(
             {
-                "id": message.from_user.id,
+                "telegram_id": message.from_user.id,
                 "username": message.from_user.username,
                 "name": data["name"],
                 "city": data["city"],
