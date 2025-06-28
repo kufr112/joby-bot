@@ -24,6 +24,7 @@ router = Router()
 class RegisterState(StatesGroup):
     name = State()
     city = State()
+    phone_choice = State()
     phone = State()
 
 
@@ -72,42 +73,31 @@ async def get_name(message: Message, state: FSMContext) -> None:
 async def get_city(message: Message, state: FSMContext) -> None:
     await state.update_data(city=message.text.strip())
     await message.answer("Укажите ваш номер телефона:", reply_markup=phone_keyboard)
-    await state.set_state(RegisterState.phone)
+    await state.set_state(RegisterState.phone_choice)
 
 
 def normalize_phone(raw: str) -> str | None:
     digits = re.sub(r"\D", "", raw)
 
+    # Беларусь
     if digits.startswith("375") and len(digits) == 12:
         code = digits[3:5]
         if code in {"25", "29", "33", "44"}:
             return "+375" + digits[3:]
 
+    # Россия (8XXXXXXXXXX → +7)
     if digits.startswith("8") and len(digits) == 11:
         digits = "7" + digits[1:]
 
     if digits.startswith("7") and len(digits) == 11:
-        code = int(digits[1:4])
-        if 901 <= code <= 999:
-            return "+" + digits
+        return "+" + digits
 
     return None
 
 
-@router.message(RegisterState.phone)
-async def get_phone(message: Message, state: FSMContext) -> None:
-    phone = message.contact.phone_number if message.contact else message.text.strip()
-    valid = normalize_phone(phone)
-    if not valid:
-        await message.answer(
-            "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n"
-            "+375291234567 или +79261234567"
-        )
-        return
-
-    await state.update_data(phone=valid)
+async def _finish_registration(message: Message, state: FSMContext, phone: str) -> None:
+    await state.update_data(phone=phone)
     data = await state.get_data()
-
     try:
         supabase.table("users").insert(
             {
@@ -124,3 +114,48 @@ async def get_phone(message: Message, state: FSMContext) -> None:
 
     await message.answer("✅ Регистрация завершена!", reply_markup=menu_keyboard)
     await state.clear()
+
+
+@router.message(RegisterState.phone_choice)
+async def choose_phone_method(message: Message, state: FSMContext) -> None:
+    if message.contact:
+        phone = message.contact.phone_number
+        valid = normalize_phone(phone)
+        if not valid:
+            await message.answer(
+                "⚠️ Номер выглядит некорректным. Попробуйте отправить другой номер."
+            )
+            return
+        await _finish_registration(message, state, valid)
+        return
+
+    text = message.text.lower() if message.text else ""
+    if "ввести" in text:
+        await message.answer("Введите номер телефона:", reply_markup=remove_keyboard)
+        await state.set_state(RegisterState.phone)
+        return
+
+    # Пользователь мог сразу прислать номер
+    if message.text:
+        phone = message.text.strip()
+        valid = normalize_phone(phone)
+        if valid:
+            await _finish_registration(message, state, valid)
+            return
+
+    await message.answer(
+        "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n""+375291234567 или +79261234567"
+    )
+
+
+@router.message(RegisterState.phone)
+async def get_phone(message: Message, state: FSMContext) -> None:
+    phone = message.text.strip()
+    valid = normalize_phone(phone)
+    if not valid:
+        await message.answer(
+            "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n""+375291234567 или +79261234567"
+        )
+        return
+
+    await _finish_registration(message, state, valid)
