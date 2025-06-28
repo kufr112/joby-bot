@@ -6,7 +6,6 @@ from datetime import datetime
 from keyboards import menu_keyboard
 from supabase_client import supabase
 
-
 router = Router()
 
 # 💼 Состояния FSM
@@ -21,7 +20,7 @@ async def start_add_job(message: Message, state: FSMContext):
     user_id = message.from_user.id
 
     # Проверяем регистрацию пользователя
-    result = supabase.table("users").select("id").eq("id", user_id).execute()
+    result = supabase.table("users").select("id").eq("telegram_id", user_id).execute()
     if not result.data:
         await message.answer("Сначала зарегистрируйтесь командой /start")
         return
@@ -60,7 +59,7 @@ async def get_price(message: Message, state: FSMContext):
     user_data = (
         supabase.table("users")
         .select("city,phone")
-        .eq("id", user_id)
+        .eq("telegram_id", user_id)
         .execute()
     )
     user = user_data.data[0] if user_data.data else {}
