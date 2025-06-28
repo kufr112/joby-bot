@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 
 from aiogram import Router
@@ -76,10 +77,37 @@ async def get_city(message: Message, state: FSMContext) -> None:
     await state.set_state(RegisterState.phone)
 
 
+def normalize_phone(raw: str) -> str | None:
+    digits = re.sub(r"\D", "", raw)
+
+    if digits.startswith("375") and len(digits) == 12:
+        code = digits[3:5]
+        if code in {"25", "29", "33", "44"}:
+            return "+375" + digits[3:]
+
+    if digits.startswith("8") and len(digits) == 11:
+        digits = "7" + digits[1:]
+
+    if digits.startswith("7") and len(digits) == 11:
+        code = int(digits[1:4])
+        if 901 <= code <= 999:
+            return "+" + digits
+
+    return None
+
+
 @router.message(RegisterState.phone)
 async def get_phone(message: Message, state: FSMContext) -> None:
     phone = message.contact.phone_number if message.contact else message.text.strip()
-    await state.update_data(phone=phone)
+    valid = normalize_phone(phone)
+    if not valid:
+        await message.answer(
+            "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n"
+            "+375291234567 или +79261234567"
+        )
+        return
+
+    await state.update_data(phone=valid)
     data = await state.get_data()
 
     try:
