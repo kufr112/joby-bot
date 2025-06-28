@@ -1,21 +1,11 @@
 import logging
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from datetime import datetime
-from supabase import create_client
-import os
-from dotenv import load_dotenv
-
-# === Supabase и .env ===
-load_dotenv()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("❌ Supabase URL или KEY не найдены в переменных окружения!")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+from supabase_client import supabase
 
 # === Логгер ===
 logger = logging.getLogger(__name__)
