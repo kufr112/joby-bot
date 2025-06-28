@@ -18,25 +18,13 @@ class AddJob(StatesGroup):
 # 🚀 Старт добавления подработки
 @router.message(lambda m: "разместить подработку" in m.text.lower())
 async def start_add_job(message: Message, state: FSMContext):
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
 
-    # Проверка существования пользователя
-    result = supabase.table("users").select("*").eq("id", user_id).execute()
+    # Проверяем регистрацию пользователя
+    result = supabase.table("users").select("id").eq("id", user_id).execute()
     if not result.data:
-        # Автоматическая регистрация
-        new_user = {
-            "id": user_id,
-            "roles": ["заказчик"],
-            "city": "Не указан",
-            "contact": f"@{message.from_user.username}" if message.from_user.username else "Не указан",
-            "created_at": datetime.utcnow().isoformat()
-        }
-        supabase.table("users").insert(new_user).execute()
-    else:
-        roles = result.data[0].get("roles", [])
-        if "заказчик" not in roles:
-            roles.append("заказчик")
-            supabase.table("users").update({"roles": roles}).eq("id", user_id).execute()
+        await message.answer("Сначала зарегистрируйтесь командой /start")
+        return
 
     await message.answer("✏️ Введите заголовок подработки (например: 'Помощь на складе'):")
     await state.set_state(AddJob.title)
@@ -68,17 +56,22 @@ async def get_price(message: Message, state: FSMContext):
     data = await state.get_data()
 
     # Получаем контакт и город пользователя из Supabase
-    user_id = str(message.from_user.id)
-    user_data = supabase.table("users").select("city,contact").eq("id", user_id).execute()
+    user_id = message.from_user.id
+    user_data = (
+        supabase.table("users")
+        .select("city,phone")
+        .eq("id", user_id)
+        .execute()
+    )
     user = user_data.data[0] if user_data.data else {}
 
     job = {
-        "user_id": user_id,
+        "user_id": str(user_id),
         "title": data["title"],
         "description": data["description"],
         "price": data["price"],
         "city": user.get("city", "Не указан"),
-        "contact": user.get("contact", "Не указан"),
+        "contact": user.get("phone", "Не указан"),
         "created_at": datetime.utcnow().isoformat()
     }
 

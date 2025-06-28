@@ -98,6 +98,9 @@ async def create_app():
 # === Приложение для Gunicorn (Render) ===
 app = asyncio.run(create_app())
 
-# === Локальный запуск (если нужно) ===
+# === Точка входа ===
 if __name__ == "__main__":
-    web.run_app(app)
+    if IS_PROD:
+        web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+    else:
+        asyncio.run(dp.start_polling(bot))
