@@ -10,11 +10,11 @@ Telegram-бот для поиска и размещения подработок
    ```
 3. Создайте файл `.env` на основе `.env.example` и заполните переменные:
    - `BOT_TOKEN`
-   - `WEBHOOK_HOST`
+   - `WEBHOOK_HOST` (нужен только при запуске через Webhook)
    - `SUPABASE_URL`
    - `SUPABASE_KEY`
    - `ADMIN_ID`
-   - `IS_PROD`
+   - `IS_PROD` — если `1`, бот запускается через Webhook (Render), иначе через polling
 4. Запустите локально:
    ```bash
    python main.py
