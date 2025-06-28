@@ -20,9 +20,9 @@ class SupabaseLogHandler(logging.Handler):
                 tb = "".join(traceback.format_exception(*record.exc_info))
             entry = {
                 "timestamp": datetime.utcnow().isoformat(),
-                "level": record.levelname,
+                "type": record.levelname,
                 "message": message,
-                "traceback": tb,
+                "details": tb,
             }
             supabase.table("logs").insert(entry).execute()
         except Exception:
@@ -54,7 +54,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     from stats_logger import log_to_supabase
     tb = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-    log_to_supabase("ERROR", str(exc_value), context={"traceback": tb})
+    log_to_supabase("ERROR", str(exc_value), details={"traceback": tb})
 
 
 sys.excepthook = handle_exception
