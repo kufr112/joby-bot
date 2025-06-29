@@ -59,6 +59,8 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 START_TIME = time.perf_counter()
 
 BOT_DUMMY = not BOT_TOKEN or BOT_TOKEN.lower() == "dummy"
+logger.info("BOT_DUMMY: %s", BOT_DUMMY)
+logger.info("Supabase dummy: %s", supabase.dummy)
 if IS_PROD and not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env для продакшена!")
 
