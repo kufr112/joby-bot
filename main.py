@@ -167,7 +167,9 @@ if __name__ == "__main__":
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
     else:
         if BOT_DUMMY:
-            logger.info("Running in dummy mode — polling disabled")
-            asyncio.run(asyncio.sleep(3600))
+            logger.error(
+                "BOT_TOKEN not configured. Create a .env file based on .env.example"
+            )
+            raise SystemExit(1)
         else:
             asyncio.run(dp.start_polling(bot))
