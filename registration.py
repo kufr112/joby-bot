@@ -1,9 +1,9 @@
 import re
+import os
 from datetime import datetime
 
 from aiogram import Router
 from aiogram.filters import Command
-import os
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
@@ -21,7 +21,6 @@ from log_utils import logger
 router = Router()
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-
 
 class RegisterState(StatesGroup):
     name = State()
@@ -47,7 +46,6 @@ async def user_exists(telegram_id: int) -> bool:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message, state: FSMContext) -> None:
-    """Register user if necessary and show the main menu."""
     StatsLogger.log(event="start_command")
 
     user_id = message.from_user.id
@@ -56,7 +54,10 @@ async def start_cmd(message: Message, state: FSMContext) -> None:
 
     try:
         result = await with_supabase_retry(
-            lambda: supabase.table("users").select("id").eq("telegram_id", user_id).execute()
+            lambda: supabase.table("users")
+            .select("id")
+            .eq("telegram_id", user_id)
+            .execute()
         )
         if not getattr(result, "data", []):
             StatsLogger.log(event="register_user_attempt", telegram_id=user_id)
@@ -72,15 +73,12 @@ async def start_cmd(message: Message, state: FSMContext) -> None:
                     }
                 ).execute()
             )
-    except Exception as e:  # pragma: no cover - external service
+    except Exception as e:
         logger.warning(f"Failed to ensure user in Supabase: {e}")
         StatsLogger.log(event="supabase_error", message=str(e))
 
     await state.clear()
-    await message.answer(
-        "👋 Добро пожаловать в Joby! Меню ниже ⬇️",
-        reply_markup=menu_keyboard,
-    )
+    await message.answer("👋 Добро пожаловать в Joby! Меню ниже ⬇️", reply_markup=menu_keyboard)
 
 
 @router.message(lambda m: m.text and "зарегистрироваться" in m.text.lower())
@@ -164,9 +162,7 @@ async def choose_phone_method(message: Message, state: FSMContext) -> None:
         phone = message.contact.phone_number
         valid = normalize_phone(phone)
         if not valid:
-            await message.answer(
-                "⚠️ Номер выглядит некорректным. Попробуйте отправить другой номер."
-            )
+            await message.answer("⚠️ Номер выглядит некорректным. Попробуйте отправить другой номер.")
             return
         await _finish_registration(message, state, valid)
         return
@@ -177,7 +173,6 @@ async def choose_phone_method(message: Message, state: FSMContext) -> None:
         await state.set_state(RegisterState.phone)
         return
 
-    # Пользователь мог сразу прислать номер
     if message.text:
         phone = message.text.strip()
         valid = normalize_phone(phone)
@@ -186,7 +181,8 @@ async def choose_phone_method(message: Message, state: FSMContext) -> None:
             return
 
     await message.answer(
-        "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n""+375291234567 или +79261234567"
+        "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n"
+        "+375291234567 или +79261234567"
     )
 
 
@@ -196,7 +192,8 @@ async def get_phone(message: Message, state: FSMContext) -> None:
     valid = normalize_phone(phone)
     if not valid:
         await message.answer(
-            "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n""+375291234567 или +79261234567"
+            "⚠️ Номер выглядит некорректным. Введите белорусский или российский номер, например:\n"
+            "+375291234567 или +79261234567"
         )
         return
 
@@ -220,6 +217,7 @@ async def last_logs(message: Message) -> None:
     except Exception as e:
         await message.answer(f"Ошибка получения логов: {e}")
         return
+
     lines = []
     for row in rows:
         ts = row.get("timestamp", "")[:19].replace("T", " ")
