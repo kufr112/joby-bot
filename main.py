@@ -171,5 +171,9 @@ if __name__ == "__main__":
                 "BOT_TOKEN not configured. Create a .env file based on .env.example"
             )
             raise SystemExit(1)
-        else:
-            asyncio.run(dp.start_polling(bot))
+        if supabase.dummy:
+            logger.error(
+                "Supabase credentials missing. Set SUPABASE_URL and SUPABASE_KEY in your .env"
+            )
+            raise SystemExit(1)
+        asyncio.run(dp.start_polling(bot))
