@@ -24,6 +24,7 @@ class DummySession:
         pass
 
 class DummyBot:
+    """Simple stand-in for ``aiogram.Bot`` when token is missing."""
     def __init__(self) -> None:
         self.session = DummySession()
 
