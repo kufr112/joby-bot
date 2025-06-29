@@ -24,7 +24,6 @@ class DummySession:
         pass
 
 class DummyBot:
-    """Simple stand-in for ``aiogram.Bot`` when token is missing."""
     def __init__(self) -> None:
         self.session = DummySession()
 
@@ -41,11 +40,18 @@ class DummyBot:
         await asyncio.sleep(0.1)
         return []
 
-# === Инициализация переменных среды ===
+# === Загрузка переменных окружения ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-IS_PROD = os.getenv("IS_PROD", "0") == "1"
+
+def env_flag(name: str, default: bool = False) -> bool:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.lower() in {"1", "true", "yes"}
+
+IS_PROD = env_flag("IS_PROD")
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
@@ -74,7 +80,7 @@ async def on_error(event, exception):
     logger.exception("Unhandled error", exc_info=exception)
     StatsLogger.log(event="unhandled_error", message=str(exception))
 
-# === Периодический health check ===
+# === Health check ===
 async def periodic_health_check() -> None:
     while True:
         issues: list[str] = []
@@ -103,6 +109,7 @@ async def periodic_health_check() -> None:
 async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
     asyncio.create_task(periodic_health_check())
+
     if IS_PROD and WEBHOOK_URL:
         async def _set_webhook():
             try:
@@ -134,7 +141,7 @@ async def on_shutdown(app: web.Application):
     except Exception:
         logger.exception("❌ Ошибка при остановке")
 
-# === Инициализация AIOHTTP приложения ===
+# === AIOHTTP-приложение ===
 async def create_app():
     logger.info("🔧 Инициализация AIOHTTP приложения")
     app = web.Application()
