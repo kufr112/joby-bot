@@ -108,6 +108,11 @@ def normalize_phone(raw: str) -> str | None:
 async def _finish_registration(message: Message, state: FSMContext, phone: str) -> None:
     await state.update_data(phone=phone)
     data = await state.get_data()
+    StatsLogger.log(
+        event="register_user_attempt",
+        telegram_id=message.from_user.id,
+        username=message.from_user.username,
+    )
     try:
         await with_supabase_retry(
             lambda: supabase.table("users").insert(
