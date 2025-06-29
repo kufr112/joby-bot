@@ -18,6 +18,7 @@ class AddJob(StatesGroup):
 # 🚀 Старт добавления подработки
 @router.message(lambda m: "разместить подработку" in m.text.lower())
 async def start_add_job(message: Message, state: FSMContext):
+    StatsLogger.log(event="click_add_job")
     user_id = message.from_user.id
 
     # Проверяем регистрацию пользователя

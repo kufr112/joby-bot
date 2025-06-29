@@ -3,6 +3,7 @@ from datetime import datetime
 
 from aiogram import Router
 from aiogram.filters import Command
+import os
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
@@ -18,6 +19,8 @@ from stats_logger import StatsLogger
 from log_utils import logger
 
 router = Router()
+
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 
 
 class RegisterState(StatesGroup):
@@ -44,6 +47,7 @@ async def user_exists(telegram_id: int) -> bool:
 
 @router.message(Command("start"))
 async def start_cmd(message: Message, state: FSMContext) -> None:
+    StatsLogger.log(event="start_command")
     if await user_exists(message.from_user.id):
         await message.answer("📌 Главное меню:", reply_markup=menu_keyboard)
         return
@@ -169,3 +173,27 @@ async def get_phone(message: Message, state: FSMContext) -> None:
         return
 
     await _finish_registration(message, state, valid)
+
+
+@router.message(Command("logs"))
+async def last_logs(message: Message) -> None:
+    """Send last 10 logs from Supabase to the admin."""
+    if message.from_user.id != ADMIN_ID:
+        return
+    try:
+        result = await with_supabase_retry(
+            lambda: supabase.table("logs")
+            .select("timestamp,type,message")
+            .order("timestamp", desc=True)
+            .limit(10)
+            .execute()
+        )
+        rows = getattr(result, "data", [])
+    except Exception as e:
+        await message.answer(f"Ошибка получения логов: {e}")
+        return
+    lines = []
+    for row in rows:
+        ts = row.get("timestamp", "")[:19].replace("T", " ")
+        lines.append(f"{ts} [{row.get('type')}] {row.get('message')}")
+    await message.answer("\n".join(lines) or "Нет логов")

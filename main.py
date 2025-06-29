@@ -8,16 +8,23 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
+from dotenv import load_dotenv
+
+from registration import router as registration_router
+from add_job import router as add_job_router
+from menu_actions import router as menu_router
+from logger_middleware import GlobalLoggerMiddleware
+from log_utils import logger
+from stats_logger import StatsLogger
+from supabase_client import supabase, with_supabase_retry
 
 
 class DummySession:
-    async def close(self) -> None:  # pragma: no cover - minimal stub
+    async def close(self) -> None:
         pass
 
 
 class DummyBot:
-    """Simple stand-in for ``aiogram.Bot`` when token is missing."""
-
     def __init__(self) -> None:
         self.session = DummySession()
 
@@ -30,17 +37,10 @@ class DummyBot:
     async def send_message(self, *args, **kwargs) -> None:
         logger.debug("DummyBot.send_message called")
 
-    async def get_updates(self, *args, **kwargs) -> list:  # noqa: D401
+    async def get_updates(self, *args, **kwargs) -> list:
         await asyncio.sleep(0.1)
         return []
-from dotenv import load_dotenv
 
-from registration import router as registration_router
-from add_job import router as add_job_router
-from logger_middleware import GlobalLoggerMiddleware
-from log_utils import logger
-from stats_logger import StatsLogger
-from supabase_client import supabase, with_supabase_retry
 
 START_TIME = time.perf_counter()
 
@@ -62,11 +62,13 @@ if BOT_DUMMY:
     bot = DummyBot()
 else:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
 dp = Dispatcher(storage=MemoryStorage())
 
 # === Регистрация роутеров и middleware ===
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
+dp.include_router(menu_router)
 dp.message.middleware(GlobalLoggerMiddleware())
 
 
@@ -78,7 +80,6 @@ async def on_error(event, exception):
 
 async def periodic_health_check() -> None:
     """Regularly check external services and log issues."""
-
     while True:
         issues: list[str] = []
         if BOT_DUMMY:
@@ -89,7 +90,7 @@ async def periodic_health_check() -> None:
                     lambda: supabase.table("users").select("id").limit(1).execute(),
                     max_retries=1,
                 )
-        except Exception as e:  # pragma: no cover - network
+        except Exception as e:
             issues.append("supabase_error")
             StatsLogger.log(event="supabase_error", message=f"health:{e}")
         try:
@@ -102,10 +103,11 @@ async def periodic_health_check() -> None:
             StatsLogger.log(event="health_check_issue", issues=issues)
         await asyncio.sleep(180)
 
-# === Обработчики запуска и остановки ===
+
 async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
     asyncio.create_task(periodic_health_check())
+
     if IS_PROD and WEBHOOK_URL:
         async def _set_webhook():
             try:
@@ -129,6 +131,7 @@ async def on_startup(app: web.Application):
     logger.info(f"Startup finished in {elapsed:.2f} sec")
     StatsLogger.log(event="startup_time", seconds=round(elapsed, 2))
 
+
 async def on_shutdown(app: web.Application):
     logger.info("🛑 Остановка бота...")
     try:
@@ -139,25 +142,25 @@ async def on_shutdown(app: web.Application):
     except Exception:
         logger.exception("❌ Ошибка при остановке")
 
-# === Создание aiohttp-приложения ===
+
 async def create_app():
     logger.info("🔧 Инициализация AIOHTTP приложения")
     app = web.Application()
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+
     async def ping(_request: web.Request) -> web.Response:
         return web.Response(text="pong")
 
     app.router.add_get("/ping", ping)
     return app
 
-# === Инициализация приложения ===
+
 app = None
 if IS_PROD:
     app = asyncio.run(create_app())
 
-# === Точка входа ===
 if __name__ == "__main__":
     if IS_PROD:
         web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
