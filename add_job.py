@@ -3,6 +3,7 @@ from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from datetime import datetime
+
 from keyboards import menu_keyboard
 from supabase_client import supabase, with_supabase_retry
 from stats_logger import StatsLogger

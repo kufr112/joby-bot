@@ -18,11 +18,10 @@ from log_utils import logger
 from stats_logger import StatsLogger
 from supabase_client import supabase, with_supabase_retry
 
-
+# === Заглушки для режима без токена ===
 class DummySession:
     async def close(self) -> None:
         pass
-
 
 class DummyBot:
     def __init__(self) -> None:
@@ -41,9 +40,7 @@ class DummyBot:
         await asyncio.sleep(0.1)
         return []
 
-
-START_TIME = time.perf_counter()
-
+# === Инициализация переменных среды ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
@@ -52,28 +49,31 @@ WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "")
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else None
 
+START_TIME = time.perf_counter()
+
 BOT_DUMMY = not BOT_TOKEN or BOT_TOKEN.lower() == "dummy"
 if IS_PROD and not WEBHOOK_HOST:
     raise ValueError("❌ WEBHOOK_HOST не найден в .env для продакшена!")
 
+# === Инициализация бота и диспетчера ===
 if BOT_DUMMY:
     bot = DummyBot()
 else:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
+# === Регистрация роутеров и middleware ===
 dp.include_router(registration_router)
 dp.include_router(add_job_router)
 dp.include_router(menu_router)
 dp.message.middleware(GlobalLoggerMiddleware())
-
 
 @dp.error()
 async def on_error(event, exception):
     logger.exception("Unhandled error", exc_info=exception)
     StatsLogger.log(event="unhandled_error", message=str(exception))
 
-
+# === Периодический health check ===
 async def periodic_health_check() -> None:
     while True:
         issues: list[str] = []
@@ -89,7 +89,7 @@ async def periodic_health_check() -> None:
             issues.append("supabase_error")
             StatsLogger.log(event="supabase_error", message=f"health:{e}")
         try:
-            if not BOT_DUMMY:
+            if not BOT_DUMMY and not IS_PROD:
                 await bot.get_updates(limit=1, timeout=1)
         except Exception:
             issues.append("telegram_error")
@@ -98,7 +98,7 @@ async def periodic_health_check() -> None:
             StatsLogger.log(event="health_check_issue", issues=issues)
         await asyncio.sleep(180)
 
-
+# === Обработчики запуска и остановки ===
 async def on_startup(app: web.Application):
     logger.info("🚀 Бот запускается...")
     asyncio.create_task(periodic_health_check())
@@ -123,7 +123,6 @@ async def on_startup(app: web.Application):
     logger.info(f"Startup finished in {elapsed:.2f} sec")
     StatsLogger.log(event="startup_time", seconds=round(elapsed, 2))
 
-
 async def on_shutdown(app: web.Application):
     logger.info("🛑 Остановка бота...")
     try:
@@ -134,7 +133,7 @@ async def on_shutdown(app: web.Application):
     except Exception:
         logger.exception("❌ Ошибка при остановке")
 
-
+# === Инициализация AIOHTTP приложения ===
 async def create_app():
     logger.info("🔧 Инициализация AIOHTTP приложения")
     app = web.Application()
@@ -148,11 +147,10 @@ async def create_app():
     app.router.add_get("/ping", ping)
     return app
 
-
+# === Запуск ===
 app = None
 if IS_PROD:
     app = asyncio.run(create_app())
-
 
 if __name__ == "__main__":
     if IS_PROD:
