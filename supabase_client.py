@@ -24,8 +24,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # Temporary debug output to verify credentials are loaded correctly
-print("SUPABASE_URL:", SUPABASE_URL)
-print("SUPABASE_KEY:", SUPABASE_KEY)
+logger.info("SUPABASE_URL: %s", SUPABASE_URL)
+logger.info("SUPABASE_KEY: %s", SUPABASE_KEY)
 
 
 def _is_dummy(value: str) -> bool:
@@ -68,13 +68,13 @@ class LazySupabase:
     def __init__(self) -> None:
         self._client: Client | None = None
         self.dummy = _is_dummy(SUPABASE_URL) or _is_dummy(SUPABASE_KEY)
-        print("Dummy mode:", self.dummy)
+        logger.info("Dummy mode: %s", self.dummy)
 
     def _ensure_client(self) -> Client | _DummySupabase:
         if self.dummy:
             return _DummySupabase()
         if self._client is None:
-            print("Creating Supabase client")
+            logger.info("Creating Supabase client")
             self._client = create_client(SUPABASE_URL, SUPABASE_KEY)
         return self._client
 
