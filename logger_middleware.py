@@ -2,7 +2,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, CallbackQuery
 from datetime import datetime
 import json
-import logging
+from log_utils import logger
 
 class GlobalLoggerMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
@@ -47,6 +47,6 @@ class GlobalLoggerMiddleware(BaseMiddleware):
                 f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
         except Exception as e:
-            logging.exception(f"Ошибка в GlobalLoggerMiddleware: {e}")
+            logger.exception(f"Ошибка в GlobalLoggerMiddleware: {e}")
 
         return await handler(event, data)
