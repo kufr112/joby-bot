@@ -47,7 +47,7 @@ async def user_exists(telegram_id: int) -> bool:
 @router.message(Command("start"))
 async def start_cmd(message: Message, state: FSMContext) -> None:
     StatsLogger.log(event="start_command")
-    logger.info("start_cmd invoked for user %s", message.from_user.id)
+    logger.info(f"start_cmd invoked for user {message.from_user.id}")
 
     user_id = message.from_user.id
     username = message.from_user.username or ""
@@ -62,7 +62,7 @@ async def start_cmd(message: Message, state: FSMContext) -> None:
         )
         if not getattr(result, "data", []):
             StatsLogger.log(event="register_user_attempt", telegram_id=user_id)
-            logger.info("Inserting new user %s into Supabase", user_id)
+            logger.info(f"Inserting new user {user_id} into Supabase")
             await with_supabase_retry(
                 lambda: supabase.table("users").insert(
                     {
@@ -137,7 +137,7 @@ async def _finish_registration(message: Message, state: FSMContext, phone: str) 
         telegram_id=message.from_user.id,
         username=message.from_user.username,
     )
-    logger.info("Saving user %s to Supabase", message.from_user.id)
+    logger.info(f"Saving user {message.from_user.id} to Supabase")
     try:
         await with_supabase_retry(
             lambda: supabase.table("users").insert(
