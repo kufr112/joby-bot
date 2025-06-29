@@ -3,6 +3,7 @@ from aiogram.types import Message
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from datetime import datetime
+
 from keyboards import menu_keyboard
 from supabase_client import supabase, with_supabase_retry
 from stats_logger import StatsLogger
@@ -33,6 +34,7 @@ async def start_add_job(message: Message, state: FSMContext):
     except Exception as e:
         StatsLogger.log(event="supabase_error", message=str(e))
         registered = False
+
     if not registered:
         await message.answer("Сначала зарегистрируйтесь командой /start")
         return
