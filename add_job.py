@@ -4,7 +4,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from datetime import datetime
 from keyboards import menu_keyboard
-from supabase_client import supabase
+from supabase_client import supabase, with_supabase_retry
+from stats_logger import StatsLogger
 
 router = Router()
 
@@ -17,11 +18,22 @@ class AddJob(StatesGroup):
 # 🚀 Старт добавления подработки
 @router.message(lambda m: "разместить подработку" in m.text.lower())
 async def start_add_job(message: Message, state: FSMContext):
+    StatsLogger.log(event="click_add_job")
     user_id = message.from_user.id
 
     # Проверяем регистрацию пользователя
-    result = supabase.table("users").select("id").eq("telegram_id", user_id).execute()
-    if not result.data:
+    try:
+        result = await with_supabase_retry(
+            lambda: supabase.table("users")
+            .select("id")
+            .eq("telegram_id", user_id)
+            .execute()
+        )
+        registered = bool(getattr(result, "data", []))
+    except Exception as e:
+        StatsLogger.log(event="supabase_error", message=str(e))
+        registered = False
+    if not registered:
         await message.answer("Сначала зарегистрируйтесь командой /start")
         return
 
@@ -56,13 +68,17 @@ async def get_price(message: Message, state: FSMContext):
 
     # Получаем контакт и город пользователя из Supabase
     user_id = message.from_user.id
-    user_data = (
-        supabase.table("users")
-        .select("city,phone")
-        .eq("telegram_id", user_id)
-        .execute()
-    )
-    user = user_data.data[0] if user_data.data else {}
+    try:
+        user_data = await with_supabase_retry(
+            lambda: supabase.table("users")
+            .select("city,phone")
+            .eq("telegram_id", user_id)
+            .execute()
+        )
+        user = user_data.data[0] if getattr(user_data, "data", []) else {}
+    except Exception as e:
+        StatsLogger.log(event="supabase_error", message=str(e))
+        user = {}
 
     job = {
         "user_id": str(user_id),
@@ -75,7 +91,11 @@ async def get_price(message: Message, state: FSMContext):
     }
 
     # Сохраняем подработку в Supabase
-    supabase.table("jobs").insert(job).execute()
+    try:
+        await with_supabase_retry(lambda: supabase.table("jobs").insert(job).execute())
+        StatsLogger.log(event="job_created")
+    except Exception as e:
+        StatsLogger.log(event="supabase_error", message=str(e))
 
     await message.answer(
         f"✅ <b>Подработка размещена!</b>\n\n"
