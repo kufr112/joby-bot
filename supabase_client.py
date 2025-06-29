@@ -2,7 +2,7 @@
 
 The original implementation instantiated Supabase on import which could
 perform network operations and raised errors when credentials were not
-provided.  For fast and predictable startup we create the client only on
+provided. For fast and predictable startup we create the client only on
 first use and return a no-op stub when credentials are missing or set to
 ``"dummy"``.
 """
@@ -17,15 +17,14 @@ from log_utils import logger
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-# Temporary debug output to verify credentials are loaded correctly
-logger.info("SUPABASE_URL: %s", SUPABASE_URL)
-logger.info("SUPABASE_KEY: %s", SUPABASE_KEY)
+# Debug output to verify credentials
+logger.info("SUPABASE_URL present: %s", bool(SUPABASE_URL))
+logger.info("SUPABASE_KEY present: %s", bool(SUPABASE_KEY))
 
 
 def _is_dummy(value: str) -> bool:
@@ -34,31 +33,29 @@ def _is_dummy(value: str) -> bool:
 
 class _DummyResponse:
     """Minimal object returned from DummyTable.execute()."""
-
     data: list[Any] = []
 
 
 class _DummyTable:
     """Mimic Supabase table/query interface and return empty data."""
-
-    def select(self, *args: Any, **kwargs: Any) -> "_DummyTable":  # noqa: D401
+    def select(self, *args: Any, **kwargs: Any) -> "_DummyTable":
         return self
 
-    def insert(self, *args: Any, **kwargs: Any) -> "_DummyTable":  # noqa: D401
+    def insert(self, *args: Any, **kwargs: Any) -> "_DummyTable":
         return self
 
-    def update(self, *args: Any, **kwargs: Any) -> "_DummyTable":  # noqa: D401
+    def update(self, *args: Any, **kwargs: Any) -> "_DummyTable":
         return self
 
-    def eq(self, *args: Any, **kwargs: Any) -> "_DummyTable":  # noqa: D401
+    def eq(self, *args: Any, **kwargs: Any) -> "_DummyTable":
         return self
 
-    def execute(self) -> _DummyResponse:  # noqa: D401
+    def execute(self) -> _DummyResponse:
         return _DummyResponse()
 
 
 class _DummySupabase:
-    def table(self, name: str) -> _DummyTable:  # noqa: D401
+    def table(self, name: str) -> _DummyTable:
         return _DummyTable()
 
 
@@ -78,7 +75,7 @@ class LazySupabase:
             self._client = create_client(SUPABASE_URL, SUPABASE_KEY)
         return self._client
 
-    def table(self, name: str) -> Any:  # noqa: D401
+    def table(self, name: str) -> Any:
         return self._ensure_client().table(name)
 
 
@@ -87,14 +84,11 @@ supabase = LazySupabase()
 
 async def with_supabase_retry(func: Callable[[], Any], max_retries: int = 3) -> Any:
     """Execute ``func`` with retries for transient Supabase errors."""
-
     for attempt in range(1, max_retries + 1):
         try:
             return func()
-        except Exception as e:  # pragma: no cover - network depending
+        except Exception as e:
             logger.warning(f"Supabase error on attempt {attempt}: {e}")
             if attempt >= max_retries or not any(code in str(e) for code in ("500", "503")):
                 raise
             await asyncio.sleep(1)
-
-
